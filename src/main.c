@@ -9,9 +9,17 @@ int main(int ac, char** av) {
     return 1;
   }
   int sckfd = socket(AF_INET, SOCK_DGRAM, 0);
-  if (sckfd == -1)
+  if (sckfd == -1) {
+    perror("socket1");
     return 1;
-  int ttl = 1;
+  }
+  int icmp_sock = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+  if (icmp_sock == -1) {
+    perror("socket2");
+    return 1;
+  }
+  printf("all sock open\n");
+  int ttl = 8;
   if (setsockopt(sckfd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) == -1) {
     fprintf(stderr, "error setsockopt\n");
     perror("setsockopt");
@@ -31,13 +39,20 @@ int main(int ac, char** av) {
   ft_memset(buf, 0, sizeof(buf));
   printf("%d bytes send\n", retval);
 
-  retval = recvfrom(sckfd, buf, 2048, 0, (struct sockaddr*)&rcv, &len_recv);
+  retval = recvfrom(icmp_sock, buf, 2048, 0, (struct sockaddr*)&rcv, &len_recv);
   if (retval == -1) {
     fprintf(stderr, "error recvfrom\n");
     perror("recvfrom");
     return 1;
   }
+  printf("version == %d\n", buf[0] >> 4);
+  printf("ihl == %d\n", buf[0] & 0x0F);
+  printf("ttl == %d\n", buf[8]);
+  printf("ICMP type == %d\n", buf[20]);
+  printf("ICMP code == %d\n", buf[21]);
+  ft_hexdump(buf, retval, 0);
   printf("%d bytes read\n", retval);
   close(sckfd);
+  close(icmp_sock);
   return 0;
 }
