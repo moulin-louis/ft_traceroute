@@ -20,6 +20,16 @@ void handle_quit(int sig) {
   }
 }
 
+int32_t ip_to_hostname(const char* ip, char* result_str) {
+  struct sockaddr_in sa;
+  sa.sin_family = AF_INET;
+  inet_pton(AF_INET, ip, &(sa.sin_addr));
+  const int retval = getnameinfo((struct sockaddr*)&sa, sizeof(sa), result_str, NI_MAXHOST, NULL, 0, 0);
+  if (retval != 0)
+    return retval;
+  return 0;
+}
+
 int64_t change_ttl(int sock, uint64_t new_ttl) {
   const int retval = setsockopt(sock, IPPROTO_IP, IP_TTL, &new_ttl, sizeof(new_ttl));
   if (retval == -1) {
@@ -42,26 +52,23 @@ int32_t init_tc(int ac, char** av) {
     perror("socket1");
     return 1;
   }
-  trace.icmp_sck = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+  trace.icmp_sck = socket(AF_INET, SOCK_DGRAM, IPPROTO_ICMP);
   if (trace.icmp_sck == -1) {
     perror("socket2");
     return 1;
   }
-  trace.first_ttl = 1;
-  trace.port = TC_PORT;
-  trace.prot = E_UDP;
-  trace.ttl = 1;
-  trace.ttl_max = 30;
-  trace.waittime = 5;
+  trace.first_ttl = DEFAULT_FIRST_TLL;
+  trace.ttl_max = DEFAULT_MAX_TTL;
+  trace.ttl = DEFAULT_FIRST_TLL;
+  trace.port = DEFAULT_UDP_PORT;
+  trace.prot = DEFAULT_PROT;
+  trace.waittime = DEFAULT_WAITTIME;
+  trace.wait_prob = DEFAULT_WAIT_PROBE;
   apply_arg(ac, av);
   trace.dest.sin_family = AF_INET;
   trace.dest.sin_port = htons(trace.port);
   trace.dest.sin_addr.s_addr = inet_addr(av[1]);
-  if (setsockopt(trace.sck, IPPROTO_IP, IP_TTL, &trace.first_ttl, sizeof(trace.first_ttl)) == -1) {
-    perror("setsockopt_ttl");
-    return 1;
-  }
-  return 0;
+  return change_ttl(trace.sck, 1);
 }
 
 int64_t send_probe(void) {
@@ -73,12 +80,14 @@ int64_t send_probe(void) {
   return 0;
 }
 
-int64_t wait_response(struct icmphdr* icmphdr, struct iphdr* iphdr) {
+int64_t wait_response(struct iphdr* iphdr, struct icmphdr* icmphdr, struct sockaddr_in* src) {
   char buf[2048] = {0};
-  int64_t retval = 0;
+  socklen_t len = sizeof(struct sockaddr_in);
+
+  ft_memset(src, 0, sizeof(*src));
   alarm(trace.waittime);
   while (timeout == false) {
-    retval = recvfrom(trace.icmp_sck, buf, 2048, MSG_DONTWAIT, NULL, NULL);
+    const int64_t retval = recvfrom(trace.icmp_sck, buf, 2048, MSG_DONTWAIT, (struct sockaddr*)src, &len);
     if (retval == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK)
         continue;
@@ -89,9 +98,28 @@ int64_t wait_response(struct icmphdr* icmphdr, struct iphdr* iphdr) {
   }
   if (timeout == true)
     timeout = false;
+
   ft_memcpy(iphdr, buf, sizeof(iphdr));
-  ft_memcpy(icmphdr, buf + sizeof(icmphdr), sizeof(icmphdr));
+  ft_memcpy(icmphdr, buf + 20, sizeof(icmphdr));
   return 0;
+}
+
+void print_result(const struct iphdr* iphdr, const struct icmphdr* icmphdr, struct sockaddr_in* src) {
+  printf("%lu ", trace.ttl);
+  if (ft_memcmp(icmphdr, (uint64_t[]){0, 0, 0, 0, 0, 0, 0, 0}, sizeof(*icmphdr)) == 0) {
+    printf("* * *\n");
+    fflush(NULL);
+    return;
+  }
+  char* ip_str = inet_ntoa(src->sin_addr);
+  char hostname_str[HOST_NAME_MAX];
+  ip_to_hostname(ip_str, hostname_str);
+  printf("%s: ", hostname_str);
+  ;
+  printf("(%s)", ip_str);
+  printf("\n");
+  fflush(NULL);
+  (void)iphdr;
 }
 
 int main(int ac, char** av) {
@@ -109,25 +137,20 @@ int main(int ac, char** av) {
   for (uint64_t iter = 0; iter < trace.ttl_max; ++iter) {
     struct iphdr iphdr;
     struct icmphdr icmphdr;
-
+    struct sockaddr_in src;
     // send the probe
-    send_probe();
-    // wait for the response
-    wait_response(&icmphdr, &iphdr);
-    printf("%lu: ", trace.ttl);
-    if (ft_memcmp(&icmphdr, (uint64_t[]){0, 0, 0, 0, 0, 0, 0, 0}, sizeof(icmphdr)) != 0) {
-      ft_hexdump(&icmphdr, sizeof(icmphdr), 0);
-    }
-    else {
-      printf("* * *\n");
-    }
-    fflush(NULL);
-    // stop if ICMP port reset
-    trace.ttl += 1;
-    if (change_ttl(trace.sck, trace.ttl)) {
+    if (send_probe())
       break;
-    }
+    // wait for the response
+    wait_response(&iphdr, &icmphdr, &src);
+    print_result(&iphdr, &icmphdr, &src);
+    if (icmphdr.code == 3 && icmphdr.type == 3)
+      break;
     // start over with ttl += 1 otherwose
+    trace.ttl += 1;
+    if (change_ttl(trace.sck, trace.ttl))
+      break;
+    sleep(trace.wait_prob);
   }
   cleanup();
   return 0;

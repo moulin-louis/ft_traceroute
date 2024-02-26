@@ -12,14 +12,21 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <netdb.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <bits/local_lim.h>
 
 // PORT LIKELY UNUSED
-#define TC_PORT 33434
+#define DEFAULT_FIRST_TLL 1
+#define DEFAULT_MAX_TTL 30
+#define DEFAULT_UDP_PORT 33434
+#define DEFAULT_PROT E_UDP
+#define DEFAULT_WAITTIME 5
+#define DEFAULT_WAIT_PROBE 0
 
 // Which protocol used to send for probes
 typedef enum {
@@ -33,6 +40,7 @@ typedef struct {
   uint64_t ttl_max; // max ttl (default to 30)
   uint16_t port; // port used to send the udp packet (default to TC_PORT)
   uint64_t waittime; // time in seconds to wait for a ICMP response
+  uint64_t wait_prob; //tine in second sto wait between probe sending
   E_PROT prot; // protocul used (default to E_UDP)
   int sck; // socket to send the probe packet
   int icmp_sck; // socket used to receive ICMP response
