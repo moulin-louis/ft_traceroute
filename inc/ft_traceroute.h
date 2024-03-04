@@ -8,21 +8,23 @@
 #include "libft.h"
 
 #include <arpa/inet.h>
+#include <bits/local_lim.h>
 #include <errno.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <unistd.h>
-#include <bits/local_lim.h>
 
 // PORT LIKELY UNUSED
 #define DEFAULT_FIRST_TLL 1
 #define DEFAULT_MAX_TTL 30
+#define DEFAULT_SIZE_PACKET 60
 #define DEFAULT_UDP_PORT 33434
 #define DEFAULT_PROT E_UDP
 #define DEFAULT_WAITTIME 5
@@ -30,21 +32,24 @@
 
 // Which protocol used to send for probes
 typedef enum {
-  E_ICMP = 1 << 0, // Use ICMP request
-  E_UDP = 1 << 1, // Use UDP packet
+  E_ICMP = 1 << 0,          // Use ICMP request
+  E_UDP = 1 << 1,           // Use UDP packet
 } E_PROT;
 
 typedef struct {
-  uint64_t ttl; // current ttl (from 1 to ttl max)
-  uint64_t first_ttl; // first ttl to use(default to 1)
-  uint64_t ttl_max; // max ttl (default to 30)
-  uint16_t port; // port used to send the udp packet (default to TC_PORT)
-  uint64_t waittime; // time in seconds to wait for a ICMP response
-  uint64_t wait_prob; //tine in second sto wait between probe sending
-  E_PROT prot; // protocul used (default to E_UDP)
-  int sck; // socket to send the probe packet
-  int icmp_sck; // socket used to receive ICMP response
-  struct sockaddr_in dest;
+  uint64_t ttl;             // current ttl (from 1 to ttl max)
+  uint64_t first_ttl;       // first ttl to use(default to 1)
+  uint64_t ttl_max;         // max ttl (default to 30)
+  uint64_t size_packet;     // size of the probe
+  uint16_t port;            // port used to send the udp packet (default to TC_PORT)
+  uint64_t waittime;        // time in seconds to wait for a ICMP response
+  uint64_t wait_prob;       // tine in second sto wait between probe sending
+  struct timeval start_time;      // timestamp before sending probes
+  struct timeval end_time;        // timestamp after receiving probes
+  E_PROT prot;              // protocul used (default to E_UDP)
+  int sck;                  // socket to send the probe packet
+  int icmp_sck;             // socket used to receive ICMP response
+  struct sockaddr_in dest;  // dest address info
 } t_tc;
 
 #endif // FT_TRACEROUTE_H
