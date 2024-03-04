@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/select.h>
 #include <unistd.h>
 
 // PORT LIKELY UNUSED
@@ -51,6 +52,14 @@ typedef struct {
   int icmp_sck; // socket used to receive ICMP response
   struct sockaddr_in dest; // dest address info
 } t_tc;
+
+typedef struct {
+  struct timeval start_time;
+  struct timeval end_time;
+  struct sockaddr_in src;
+  struct icmphdr icmphdr;
+  double  rtt;
+} t_probe;
 
 extern bool timeout;
 extern t_tc trace;

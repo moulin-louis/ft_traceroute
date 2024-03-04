@@ -14,8 +14,6 @@ void handle_quit(const int sig) {
     cleanup();
     exit(sig);
   }
-  if (sig == SIGALRM)
-    timeout = true;
 }
 
 int64_t get_time(double* time) {

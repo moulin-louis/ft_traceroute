@@ -1,6 +1,6 @@
 #include "ft_traceroute.h"
 
-bool timeout;
+// bool timeout;
 t_tc trace;
 
 int64_t send_probe(void) {
@@ -16,47 +16,7 @@ int64_t send_probe(void) {
   return 0;
 }
 
-int64_t wait_response(struct icmphdr* icmphdr, struct sockaddr_in* src) {
-  char buf[2048] = {0};
-  socklen_t len = sizeof(struct sockaddr_in);
-
-  alarm(trace.waittime);
-  while (timeout == false) {
-    const int64_t retval = recvfrom(trace.icmp_sck, buf, 2048, MSG_DONTWAIT, (struct sockaddr*)src, &len);
-    if (retval == -1) {
-      if (errno == EAGAIN || errno == EWOULDBLOCK)
-        continue;
-      perror("recvfrom");
-      return 1;
-    }
-    break;
-  }
-  if (timeout == true)
-    timeout = false;
-  ft_memcpy(icmphdr, buf + sizeof(struct iphdr), sizeof(struct icmphdr));
-  return 0;
-}
-
-void print_result(const struct sockaddr_in* src, double rtts[trace.nbr_probes]) {
-  printf(" %lu  ", trace.ttl);
-  char* ip_str = inet_ntoa(src->sin_addr);
-  char hostname_str[HOST_NAME_MAX];
-  ft_memset(hostname_str, 0, sizeof(hostname_str));
-  ip_to_hostname(ip_str, hostname_str);
-  printf("%s ", strlen(hostname_str) ? hostname_str : ip_str);
-  printf("(%s) ", ip_str);
-  for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
-    if (rtts[idx] > 5000) {
-      printf("* ");
-      continue;
-    }
-    printf("%.3f ms ", rtts[idx]);
-  }
-  printf("\n");
-}
-
-bool all_same_results(const struct sockaddr_in srcs[trace.nbr_probes],
-                      const struct icmphdr icmphdrs[trace.nbr_probes]) {
+bool all_same_results(struct sockaddr_in srcs[trace.nbr_probes], struct icmphdr icmphdrs[trace.nbr_probes]) {
   const struct sockaddr_in sample_addr = srcs[0];
   const struct icmphdr sample_icmp = icmphdrs[0];
   for (uint64_t idx = 1; idx < trace.nbr_probes; ++idx) {
@@ -70,41 +30,91 @@ bool all_same_results(const struct sockaddr_in srcs[trace.nbr_probes],
   return true;
 }
 
-int64_t handle_probes(void) {
-  double rtts[trace.nbr_probes];
-  struct timeval start_times[trace.nbr_probes];
-  struct timeval end_times[trace.nbr_probes];
-  struct sockaddr_in srcs[trace.nbr_probes];
-  struct icmphdr icmphdrs[trace.nbr_probes];
+int64_t grab_packet(struct icmphdr* icmphdr, struct sockaddr_in* src) {
+  char buf[2048] = {0};
+  socklen_t len = sizeof(struct sockaddr_in);
 
-  ft_memset(rtts, 0, sizeof(rtts));
-  ft_memset(start_times, 0, sizeof(start_times));
-  ft_memset(end_times, 0, sizeof(end_times));
-  ft_memset(srcs, 0, sizeof(srcs));
-  ft_memset(icmphdrs, 0, sizeof(icmphdrs));
+  const int64_t retval = recvfrom(trace.icmp_sck, buf, 2048, 0, (struct sockaddr*)src, &len);
+  if (retval == -1) {
+    perror("recvfrom");
+    return 1;
+  }
+  ft_memcpy(icmphdr, buf + sizeof(struct iphdr), sizeof(struct icmphdr));
+  return 0;
+}
+
+void print_result(const t_set* probes) {
+  const t_probe* probe = ft_set_get(probes, 0);
+  printf(" %lu  ", trace.ttl);
+  char* ip_str = inet_ntoa(probe->src.sin_addr);
+  char hostname_str[HOST_NAME_MAX];
+  ft_memset(hostname_str, 0, sizeof(hostname_str));
+  ip_to_hostname(ip_str, hostname_str);
+  printf("%s ", strlen(hostname_str) ? hostname_str : ip_str);
+  printf("(%s) ", ip_str);
+
   for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
-    gettimeofday(&start_times[idx], NULL);
+    probe = ft_set_get(probes, idx);
+    if (probe->rtt == 0) {
+      printf("* ");
+      continue;
+    }
+    printf("%.3f ms ", probe->rtt);
+  }
+  printf("\n");
+}
+
+int64_t handle_probes(void) {
+  struct timeval timeout;
+  uint64_t nbr_packet = 0;
+  fd_set readfds;
+  t_set* probes = ft_set_new(sizeof(t_probe));
+  if (probes == NULL)
+    return 1;
+
+  for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
+    // uint
+    ft_set_insert(probes, (uint64_t[]){0,0,0,0,0,0,0,0}, idx);
+    t_probe* probe = ft_set_get(probes, idx);
+    gettimeofday(&probe->start_time, NULL);
     if (send_probe())
       return 1; // Return ERROR code
   }
-  for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
-    if (wait_response(&icmphdrs[idx], &srcs[idx]))
+  while (nbr_packet < trace.nbr_probes) {
+    timeout.tv_sec = trace.waittime;
+    timeout.tv_usec = 0;
+    FD_ZERO(&readfds);
+    FD_SET(trace.icmp_sck, &readfds);
+    const int retval = select(trace.icmp_sck + 1, &readfds, NULL, NULL, &timeout);
+    if (retval == -1) {
+      perror("select");
       return 1; // Return ERROR code
-    gettimeofday(&end_times[idx], NULL);
-    rtts[idx] = ((end_times[idx].tv_sec - start_times[idx].tv_sec) * 1000000L +
-                 (end_times[idx].tv_usec - start_times[idx].tv_usec)) /
-      1000.0;
+    }
+    if (retval == 0)
+      break;
+    if (FD_ISSET(trace.icmp_sck, &readfds)) {
+      t_probe* probe = ft_set_get(probes, nbr_packet);
+      grab_packet(&probe->icmphdr, &probe->src);
+      gettimeofday(&probe->end_time, NULL);
+      probe->rtt = ((probe->end_time.tv_sec - probe->start_time.tv_sec) * 1000000L +
+                    (probe->end_time.tv_usec - probe->start_time.tv_usec)) /
+        1000.0;
+      nbr_packet += 1;
+    }
   }
-  print_result(&srcs[0], rtts);
-  if (icmphdrs[0].type == ICMP_DEST_UNREACH && icmphdrs[0].code == ICMP_PORT_UNREACH)
+  print_result(probes);
+  t_probe* probe = ft_set_get(probes, 0);
+  if (probe->icmphdr.type == ICMP_DEST_UNREACH && probe->icmphdr.code == ICMP_PORT_UNREACH) {
+    ft_set_destroy(probes);
     return 0; // Return SUCCESS code
-  return 2; // Return TIMEOUT code
+  }
+  ft_set_destroy(probes);
+  return 2;
 }
 
 int main(int ac, char** av) {
   if (ac == 1) {
-    // display_usage();
-    fprintf(stderr, "Wrong nbr of args\n");
+    fprintf(stderr, "Usage: ft_traceroute [option] host\n");
     return 1;
   }
   if (init_tc(ac, av))
