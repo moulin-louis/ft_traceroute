@@ -7,5 +7,6 @@ add_compile_options(-Wall -Werror -Wextra -g)
 include_directories(./inc ./src/libft/inc)
 add_subdirectory(./src/libft)
 
-add_executable(ft_traceroute src/main.c src/utils.c)
+add_executable(ft_traceroute src/main.c src/utils.c
+        src/init.c)
 target_link_libraries(ft_traceroute ft)

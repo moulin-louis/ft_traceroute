@@ -55,6 +55,9 @@ typedef struct {
 extern bool timeout;
 extern t_tc trace;
 
+//Init a t_tc struct based on argc/argv
+int64_t init_tc(const int ac, char** av);
+
 // cleanup the trace struct (close both socket)
 void cleanup(void);
 
