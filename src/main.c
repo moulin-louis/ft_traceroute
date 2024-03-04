@@ -71,7 +71,7 @@ int64_t wait_response(struct icmphdr* icmphdr, struct sockaddr_in* src) {
   }
   if (timeout == true)
     timeout = false;
-  ft_memcpy(icmphdr, buf + sizeof(struct iphdr), sizeof(icmphdr));
+  ft_memcpy(icmphdr, buf + sizeof(struct iphdr), sizeof(*icmphdr));
   return 0;
 }
 
