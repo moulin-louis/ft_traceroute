@@ -38,5 +38,10 @@ int64_t init_tc(const int ac, char** av) {
     perror("inet_pton");
     return 1;
   }
+
+  trace.probes = ft_set_new(sizeof(t_probe));
+  if (trace.probes == NULL)
+    return 1;
+
   return change_ttl(trace.sck, 1);
 }

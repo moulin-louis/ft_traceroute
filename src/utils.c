@@ -7,6 +7,8 @@
 void cleanup(void) {
   close(trace.sck);
   close(trace.icmp_sck);
+  if (trace.probes)
+    ft_set_destroy(trace.probes);
 }
 
 void handle_quit(const int sig) {

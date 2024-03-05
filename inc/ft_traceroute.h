@@ -51,6 +51,7 @@ typedef struct {
   int sck; // socket to send the probe packet
   int icmp_sck; // socket used to receive ICMP response
   struct sockaddr_in dest; // dest address info
+  t_set*  probes; //set of probes for each TTL
 } t_tc;
 
 typedef struct {
