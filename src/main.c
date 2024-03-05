@@ -66,23 +66,25 @@ void print_result(const t_set* probes) {
 
 int64_t handle_probes(void) {
   struct timeval timeout;
-  uint64_t nbr_packet = 0;
   fd_set readfds;
+  uint64_t nbr_packet = 0;
   t_set* probes = ft_set_new(sizeof(t_probe));
   if (probes == NULL)
     return 1;
 
+  // Init X probes in the set
   for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
-    // uint
-    ft_set_insert(probes, (uint64_t[]){0,0,0,0,0,0,0,0}, idx);
-    t_probe* probe = ft_set_get(probes, idx);
-    gettimeofday(&probe->start_time, NULL);
+    t_probe probe;
+    ft_memset(&probe, 0, sizeof(probe));
+    ft_set_push(probes, &probe, sizeof(probe));
+  }
+  // Send each probe and update their timestamp
+  for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
+    gettimeofday(&((t_probe*)ft_set_get(probes, idx))->start_time, NULL);
     if (send_probe())
       return 1; // Return ERROR code
   }
-  while (nbr_packet < trace.nbr_probes) {
-    timeout.tv_sec = trace.waittime;
-    timeout.tv_usec = 0;
+  while (true) {
     FD_ZERO(&readfds);
     FD_SET(trace.icmp_sck, &readfds);
     const int retval = select(trace.icmp_sck + 1, &readfds, NULL, NULL, &timeout);
@@ -91,7 +93,7 @@ int64_t handle_probes(void) {
       return 1; // Return ERROR code
     }
     if (retval == 0)
-      break;
+      break; //Break cause of timeout
     if (FD_ISSET(trace.icmp_sck, &readfds)) {
       t_probe* probe = ft_set_get(probes, nbr_packet);
       grab_packet(&probe->icmphdr, &probe->src);
@@ -99,11 +101,12 @@ int64_t handle_probes(void) {
       probe->rtt = ((probe->end_time.tv_sec - probe->start_time.tv_sec) * 1000000L +
                     (probe->end_time.tv_usec - probe->start_time.tv_usec)) /
         1000.0;
+      ft_set_push(probes, &probe, sizeof(probe));
       nbr_packet += 1;
     }
   }
   print_result(probes);
-  t_probe* probe = ft_set_get(probes, 0);
+  const t_probe* probe = ft_set_get(probes, 0);
   if (probe->icmphdr.type == ICMP_DEST_UNREACH && probe->icmphdr.code == ICMP_PORT_UNREACH) {
     ft_set_destroy(probes);
     return 0; // Return SUCCESS code
