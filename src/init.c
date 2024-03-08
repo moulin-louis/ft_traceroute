@@ -32,16 +32,18 @@ int64_t init_tc(const int ac, char** av) {
   trace.waittime = DEFAULT_WAITTIME;
   trace.wait_prob = DEFAULT_WAIT_PROBE;
   apply_arg(ac, av);
+  hostname_to_sockaddr(av[1], &trace.dest);
   trace.dest.sin_family = AF_INET;
   trace.dest.sin_port = htons(trace.port);
-  if (inet_pton(AF_INET, av[1], &trace.dest.sin_addr) != 1) {
-    perror("inet_pton");
-    return 1;
-  }
-
   trace.probes = ft_set_new(sizeof(t_probe));
   if (trace.probes == NULL)
     return 1;
-
+  if (ft_set_reserve(trace.probes, trace.nbr_probes))
+    return 1;
+  for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
+    t_probe probe;
+    ft_memset(&probe, 0, sizeof(probe));
+    ft_set_push(trace.probes, &probe, sizeof(probe));
+  }
   return change_ttl(trace.sck, 1);
 }

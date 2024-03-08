@@ -17,12 +17,11 @@
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/select.h>
 #include <unistd.h>
 
-// PORT LIKELY UNUSED
 #define DEFAULT_FIRST_TLL 1
 #define DEFAULT_MAX_TTL 30
 #define DEFAULT_SIZE_PACKET 60
@@ -39,19 +38,19 @@ typedef enum {
 } E_PROT;
 
 typedef struct {
-  uint64_t ttl; // current ttl (from 1 to ttl max)
-  uint64_t first_ttl; // first ttl to use(default to 1)
+  uint64_t ttl; // current ttl (from 1 to `ttl_max`)
+  uint64_t first_ttl; // first ttl to use (default to 1)
   uint64_t ttl_max; // max ttl (default to 30)
-  uint64_t size_packet; // size of the probe
-  uint64_t nbr_probes; // number of probes to send for each ttl
+  uint64_t size_packet; // size of the probe (default to 60)
+  uint64_t nbr_probes; // number of probes to send for each ttl (default to 3)
   uint16_t port; // port used to send the udp packet (default to TC_PORT)
-  uint64_t waittime; // time in seconds to wait for a ICMP response
-  uint64_t wait_prob; // tine in second sto wait between probe sending
+  uint64_t waittime; // time in seconds to wait for a ICMP response (default to 5)
+  uint64_t wait_prob; // tine in second to wait between probe sending (default to 0)
   E_PROT prot; // protocul used (default to E_UDP)
   int sck; // socket to send the probe packet
   int icmp_sck; // socket used to receive ICMP response
   struct sockaddr_in dest; // dest address info
-  t_set*  probes; //set of probes for each TTL
+  t_set* probes; // set of probes for each TTL
 } t_tc;
 
 typedef struct {
@@ -59,13 +58,12 @@ typedef struct {
   struct timeval end_time;
   struct sockaddr_in src;
   struct icmphdr icmphdr;
-  double  rtt;
+  double rtt;
 } t_probe;
 
-extern bool timeout;
 extern t_tc trace;
 
-//Init a t_tc struct based on argc/argv
+// Init a t_tc struct based on argc/argv
 int64_t init_tc(const int ac, char** av);
 
 // cleanup the trace struct (close both socket)
@@ -79,5 +77,8 @@ int64_t ip_to_hostname(const char* ip, char* result_str);
 
 // Change the TTL of a given socket to a given ttl
 int64_t change_ttl(int sock, uint64_t new_ttl);
+
+// Convert a given hostname in ASCII to a already-allocated sockaddr
+int32_t hostname_to_sockaddr(const char* hostname, void* result_ptr);
 
 #endif // FT_TRACEROUTE_H

@@ -1,15 +1,13 @@
 #include "ft_traceroute.h"
 
-// bool timeout;
 t_tc trace;
 
 int64_t send_probe(void) {
   uint8_t probe[trace.size_packet];
 
-  ft_memset(&probe, 0, sizeof(probe));
-  const int64_t retval =
-    sendto(trace.sck, probe, trace.size_packet, 0, (struct sockaddr*)&trace.dest, sizeof(trace.dest));
-  if (retval == -1) {
+  ft_memset(probe, 0, sizeof(probe));
+  const int64_t ret = sendto(trace.sck, probe, trace.size_packet, 0, (struct sockaddr*)&trace.dest, sizeof(trace.dest));
+  if (ret == -1) {
     perror("sendto probe");
     return 1;
   }
@@ -17,10 +15,10 @@ int64_t send_probe(void) {
 }
 
 int64_t grab_packet(struct icmphdr* icmphdr, struct sockaddr_in* src) {
-  char buf[2048] = {0};
+  uint8_t buf[sizeof(struct iphdr) + sizeof(struct icmp)] = {0};
   socklen_t len = sizeof(struct sockaddr_in);
 
-  const int64_t retval = recvfrom(trace.icmp_sck, buf, 2048, 0, (struct sockaddr*)src, &len);
+  const int64_t retval = recvfrom(trace.icmp_sck, buf, sizeof(buf), 0, (struct sockaddr*)src, &len);
   if (retval == -1) {
     perror("recvfrom");
     return 1;
@@ -29,16 +27,16 @@ int64_t grab_packet(struct icmphdr* icmphdr, struct sockaddr_in* src) {
   return 0;
 }
 
-void print_result(void) {
+int64_t print_result(void) {
+  char hostname_str[HOST_NAME_MAX] = {0};
   const t_probe* probe = ft_set_get(trace.probes, 0);
-  printf(" %lu  ", trace.ttl);
   char* ip_str = inet_ntoa(probe->src.sin_addr);
-  char hostname_str[HOST_NAME_MAX];
-  ft_memset(hostname_str, 0, sizeof(hostname_str));
+
   ip_to_hostname(ip_str, hostname_str);
+
+  printf(" %lu  ", trace.ttl);
   printf("%s ", ft_strlen(hostname_str) ? hostname_str : ip_str);
   printf("(%s) ", ip_str);
-
   for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
     probe = ft_set_get(trace.probes, idx);
     if (probe->rtt == 0) {
@@ -48,6 +46,10 @@ void print_result(void) {
     printf("%.3f ms ", probe->rtt);
   }
   printf("\n");
+  probe = ft_set_get(trace.probes, 0);
+  if (probe->icmphdr.type == ICMP_DEST_UNREACH && probe->icmphdr.code == ICMP_PORT_UNREACH)
+    return 0;
+  return 2;
 }
 
 int64_t handle_probes(void) {
@@ -55,20 +57,18 @@ int64_t handle_probes(void) {
   fd_set readfds;
   uint64_t nbr_packet = 0;
 
-  timeout.tv_sec = 5;
+  timeout.tv_sec = trace.waittime;
   timeout.tv_usec = 0;
-  // Init X probes in the set
-  for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
-    t_probe probe;
-    ft_memset(&probe, 0, sizeof(probe));
-    ft_set_push(trace.probes, &probe, sizeof(probe));
-  }
-  // Send each probe and update their timestamp
+  // Reset all probes
+  ft_memset(trace.probes->data, 0, trace.probes->len * trace.probes->nbytes_data);
+  // Send all probes
   for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
     gettimeofday(&((t_probe*)ft_set_get(trace.probes, idx))->start_time, NULL);
     if (send_probe())
       return 1; // Return ERROR code
+    usleep(2000);
   }
+  // Wait up to timeout for probes
   while (true) {
     FD_ZERO(&readfds);
     FD_SET(trace.icmp_sck, &readfds);
@@ -81,22 +81,18 @@ int64_t handle_probes(void) {
       break; // Break cause of timeout
     if (FD_ISSET(trace.icmp_sck, &readfds)) {
       t_probe* probe = ft_set_get(trace.probes, nbr_packet);
-      grab_packet(&probe->icmphdr, &probe->src);
+      if (grab_packet(&probe->icmphdr, &probe->src))
+        return 1;
       gettimeofday(&probe->end_time, NULL);
       probe->rtt = ((probe->end_time.tv_sec - probe->start_time.tv_sec) * 1000000L +
                     (probe->end_time.tv_usec - probe->start_time.tv_usec)) /
         1000.0;
-      ft_set_push(trace.probes, &probe, sizeof(probe));
       nbr_packet += 1;
     }
+    if (nbr_packet == trace.nbr_probes)
+      break;
   }
-  print_result();
-  const t_probe* probe = ft_set_get(trace.probes, 0);
-  if (probe->icmphdr.type == ICMP_DEST_UNREACH && probe->icmphdr.code == ICMP_PORT_UNREACH) {
-    return 0; // Return SUCCESS code
-  }
-  ft_set_clear(trace.probes);
-  return 2;
+  return print_result();
 }
 
 int main(int ac, char** av) {
