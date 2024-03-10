@@ -84,9 +84,7 @@ int64_t handle_probes(void) {
       if (grab_packet(&probe->icmphdr, &probe->src))
         return 1;
       gettimeofday(&probe->end_time, NULL);
-      probe->rtt = ((probe->end_time.tv_sec - probe->start_time.tv_sec) * 1000000L +
-                    (probe->end_time.tv_usec - probe->start_time.tv_usec)) /
-        1000.0;
+      probe->rtt = (((probe->end_time.tv_sec - probe->start_time.tv_sec) * 1000000L + (probe->end_time.tv_usec - probe->start_time.tv_usec)) / 1000.0) - 2;
       nbr_packet += 1;
     }
     if (nbr_packet == trace.nbr_probes)
@@ -95,7 +93,7 @@ int64_t handle_probes(void) {
   return print_result();
 }
 
-int main(int ac, char** av) {
+int main(int ac, const char** av) {
   if (ac == 1) {
     fprintf(stderr, "Usage: ft_traceroute [option] host\n");
     return 1;

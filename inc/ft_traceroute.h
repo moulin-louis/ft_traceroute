@@ -21,6 +21,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <netinet/udp.h>
 
 #define DEFAULT_FIRST_TLL 1
 #define DEFAULT_MAX_TTL 30
@@ -38,6 +39,14 @@ typedef enum {
 } E_PROT;
 
 typedef struct {
+  struct timeval start_time;
+  struct timeval end_time;
+  struct sockaddr_in src;
+  struct icmphdr icmphdr;
+  double rtt; //round trip time in ms
+} t_probe;
+
+typedef struct {
   uint64_t ttl; // current ttl (from 1 to `ttl_max`)
   uint64_t first_ttl; // first ttl to use (default to 1)
   uint64_t ttl_max; // max ttl (default to 30)
@@ -49,22 +58,15 @@ typedef struct {
   E_PROT prot; // protocul used (default to E_UDP)
   int sck; // socket to send the probe packet
   int icmp_sck; // socket used to receive ICMP response
+  uint16_t id; //ipv4 id
   struct sockaddr_in dest; // dest address info
   t_set* probes; // set of probes for each TTL
 } t_tc;
 
-typedef struct {
-  struct timeval start_time;
-  struct timeval end_time;
-  struct sockaddr_in src;
-  struct icmphdr icmphdr;
-  double rtt;
-} t_probe;
-
 extern t_tc trace;
 
 // Init a t_tc struct based on argc/argv
-int64_t init_tc(const int ac, char** av);
+int64_t init_tc(const int ac, const char** av);
 
 // cleanup the trace struct (close both socket)
 void cleanup(void);
@@ -80,5 +82,8 @@ int64_t change_ttl(int sock, uint64_t new_ttl);
 
 // Convert a given hostname in ASCII to a already-allocated sockaddr
 int32_t hostname_to_sockaddr(const char* hostname, void* result_ptr);
+
+//calculate rtt between 2 timeval
+double calculate_rtt(const struct timeval start_time, const struct timeval end_time);
 
 #endif // FT_TRACEROUTE_H

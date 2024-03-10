@@ -4,14 +4,14 @@
 
 #include "ft_traceroute.h"
 
-static int64_t apply_arg(const int ac, char** av) {
+static int64_t apply_arg(const int ac, const char** av) {
   (void)trace;
   (void)ac;
   (void)av;
   return 0;
 }
 
-int64_t init_tc(const int ac, char** av) {
+int64_t init_tc(const int ac, const char** av) {
   trace.sck = socket(AF_INET, SOCK_DGRAM, 0);
   if (trace.sck == -1) {
     perror("socket");
@@ -22,6 +22,7 @@ int64_t init_tc(const int ac, char** av) {
     perror("socket_icmp");
     return 1;
   }
+  // setsockopt(trace.icmp_sck, SOL_IP, );
   trace.first_ttl = DEFAULT_FIRST_TLL;
   trace.ttl_max = DEFAULT_MAX_TTL;
   trace.ttl = DEFAULT_FIRST_TLL;

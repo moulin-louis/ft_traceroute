@@ -62,3 +62,7 @@ int64_t change_ttl(const int sock, const uint64_t new_ttl) {
   }
   return 0;
 }
+double calculate_rtt(const struct timeval start_time, const struct timeval end_time)
+ {
+  return ((end_time.tv_sec - start_time.tv_sec) * 1000000L + (end_time.tv_usec - start_time.tv_usec)) / 1000.0;
+}
