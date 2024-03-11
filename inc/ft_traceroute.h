@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <ifaddrs.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -50,7 +51,7 @@ typedef struct {
   uint64_t ttl; // current ttl (from 1 to `ttl_max`)
   uint64_t first_ttl; // first ttl to use (default to 1)
   uint64_t ttl_max; // max ttl (default to 30)
-  uint64_t size_packet; // size of the probe (default to 60)
+  uint64_t size_probe; // size of the probe (default to 60)
   uint64_t nbr_probes; // number of probes to send for each ttl (default to 3)
   uint16_t port; // port used to send the udp packet (default to TC_PORT)
   uint64_t waittime; // time in seconds to wait for a ICMP response (default to 5)
@@ -58,12 +59,16 @@ typedef struct {
   E_PROT prot; // protocul used (default to E_UDP)
   int sck; // socket to send the probe packet
   int icmp_sck; // socket used to receive ICMP response
+  uint8_t*  packet; // buffer to store the probe packet
+  uint64_t size_packet; // size of the packet buffer
   uint16_t id; //ipv4 id
+  struct sockaddr_in src; // source address info
   struct sockaddr_in dest; // dest address info
   t_set* probes; // set of probes for each TTL
 } t_tc;
 
 extern t_tc trace;
+extern volatile bool timeout;
 
 // Init a t_tc struct based on argc/argv
 int64_t init_tc(const int ac, const char** av);
@@ -85,5 +90,8 @@ int32_t hostname_to_sockaddr(const char* hostname, void* result_ptr);
 
 //calculate rtt between 2 timeval
 double calculate_rtt(const struct timeval start_time, const struct timeval end_time);
+
+// Calculate the checksum of a given buffer
+uint16_t checksum(uint16_t* iphdr, uint64_t nbytes);
 
 #endif // FT_TRACEROUTE_H

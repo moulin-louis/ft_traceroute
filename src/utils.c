@@ -16,17 +16,9 @@ void handle_quit(const int sig) {
     cleanup();
     exit(sig);
   }
-}
-
-int64_t get_time(double* time) {
-  struct timeval tst;
-
-  if (gettimeofday(&tst, NULL) == -1) {
-    perror("gettimeofday");
-    return 1;
+  if (sig == SIGALRM) {
+    timeout = true;
   }
-  *time = tst.tv_sec * 1000 + tst.tv_usec / 1000;
-  return 0;
 }
 
 int64_t ip_to_hostname(const char* ip, char* result_str) {
@@ -62,7 +54,25 @@ int64_t change_ttl(const int sock, const uint64_t new_ttl) {
   }
   return 0;
 }
-double calculate_rtt(const struct timeval start_time, const struct timeval end_time)
- {
+
+double calculate_rtt(const struct timeval start_time, const struct timeval end_time) {
   return ((end_time.tv_sec - start_time.tv_sec) * 1000000L + (end_time.tv_usec - start_time.tv_usec)) / 1000.0;
+}
+
+// calculate the checksum of the ip header
+uint16_t checksum(uint16_t* iphdr, uint64_t nbytes) {
+  uint16_t result = 0;
+  uint32_t sum = 0;
+  while (nbytes > 1) {
+    sum += *iphdr++;
+    nbytes -= 2;
+  }
+  if (nbytes == 1) {
+    *(uint8_t*)&result = *(uint8_t*)iphdr;
+    sum += result;
+  }
+  sum = (sum >> 16) + (sum & 0xFFFF);
+  sum += (sum >> 16);
+  result = ~sum;
+  return result;
 }

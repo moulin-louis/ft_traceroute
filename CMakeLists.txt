@@ -3,7 +3,7 @@ project(ft_traceroute C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_compile_options(-Wall -Werror -Wextra -g -Ofast)
+add_compile_options(-Wall -Werror -Wextra -g -O2)
 include_directories(./inc ./src/libft/inc)
 add_subdirectory(./src/libft)
 

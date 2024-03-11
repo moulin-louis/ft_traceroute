@@ -1,12 +1,19 @@
 #include "ft_traceroute.h"
 
 t_tc trace;
+volatile bool timeout;
 
-int64_t send_probe(void) {
-  uint8_t probe[trace.size_packet];
+int64_t send_probe(const uint16_t port, const uint64_t ttl, const uint64_t id) {
+  struct iphdr* ip_hdr =  (struct iphdr*)trace.packet;
+  // struct udphdr* udp_hdr = (struct udphdr*)(packet + sizeof(struct ip));
 
-  ft_memset(probe, 0, sizeof(probe));
-  const int64_t ret = sendto(trace.sck, probe, trace.size_packet, 0, (struct sockaddr*)&trace.dest, sizeof(trace.dest));
+  if (change_ttl(trace.sck, ttl))
+    return 1;
+  ip_hdr->id = htons(id);
+  ip_hdr->ttl = ttl;
+  ip_hdr->check = checksum((uint16_t*)ip_hdr, sizeof(struct iphdr));
+  trace.dest.sin_port = port;
+  const int64_t ret = sendto(trace.sck, trace.packet, trace.size_packet, 0, (struct sockaddr*)&trace.dest, sizeof(trace.dest));
   if (ret == -1) {
     perror("sendto probe");
     return 1;
@@ -14,16 +21,16 @@ int64_t send_probe(void) {
   return 0;
 }
 
-int64_t grab_packet(struct icmphdr* icmphdr, struct sockaddr_in* src) {
-  uint8_t buf[sizeof(struct iphdr) + sizeof(struct icmp)] = {0};
+int64_t grab_packet(uint8_t* buf, struct sockaddr_in* src) {
   socklen_t len = sizeof(struct sockaddr_in);
 
-  const int64_t retval = recvfrom(trace.icmp_sck, buf, sizeof(buf), 0, (struct sockaddr*)src, &len);
+  const int64_t retval = recvfrom(trace.icmp_sck, buf, sizeof(buf), MSG_DONTWAIT, (struct sockaddr*)src, &len);
   if (retval == -1) {
+    if (errno == EWOULDBLOCK || errno == EAGAIN)
+      return 2;
     perror("recvfrom");
     return 1;
   }
-  ft_memcpy(icmphdr, buf + sizeof(struct iphdr), sizeof(struct icmphdr));
   return 0;
 }
 
@@ -52,47 +59,6 @@ int64_t print_result(void) {
   return 2;
 }
 
-int64_t handle_probes(void) {
-  struct timeval timeout;
-  fd_set readfds;
-  uint64_t nbr_packet = 0;
-
-  timeout.tv_sec = trace.waittime;
-  timeout.tv_usec = 0;
-  // Reset all probes
-  ft_memset(trace.probes->data, 0, trace.probes->len * trace.probes->nbytes_data);
-  // Send all probes
-  for (uint64_t idx = 0; idx < trace.nbr_probes; ++idx) {
-    gettimeofday(&((t_probe*)ft_set_get(trace.probes, idx))->start_time, NULL);
-    if (send_probe())
-      return 1; // Return ERROR code
-    usleep(2000);
-  }
-  // Wait up to timeout for probes
-  while (true) {
-    FD_ZERO(&readfds);
-    FD_SET(trace.icmp_sck, &readfds);
-    const int retval = select(trace.icmp_sck + 1, &readfds, NULL, NULL, &timeout);
-    if (retval == -1) {
-      perror("select");
-      return 1; // Return ERROR code
-    }
-    if (retval == 0)
-      break; // Break cause of timeout
-    if (FD_ISSET(trace.icmp_sck, &readfds)) {
-      t_probe* probe = ft_set_get(trace.probes, nbr_packet);
-      if (grab_packet(&probe->icmphdr, &probe->src))
-        return 1;
-      gettimeofday(&probe->end_time, NULL);
-      probe->rtt = (((probe->end_time.tv_sec - probe->start_time.tv_sec) * 1000000L + (probe->end_time.tv_usec - probe->start_time.tv_usec)) / 1000.0) - 2;
-      nbr_packet += 1;
-    }
-    if (nbr_packet == trace.nbr_probes)
-      break;
-  }
-  return print_result();
-}
-
 int main(int ac, const char** av) {
   if (ac == 1) {
     fprintf(stderr, "Usage: ft_traceroute [option] host\n");
@@ -100,19 +66,35 @@ int main(int ac, const char** av) {
   }
   if (init_tc(ac, av))
     return 1;
+  //print source address
   printf("traceroute to %s (%s), %ld hops max, %ld byte packets\n", av[1], inet_ntoa(trace.dest.sin_addr),
-         trace.ttl_max, trace.size_packet);
-  signal(SIGALRM, handle_quit);
+         trace.ttl_max, trace.size_probe);
   signal(SIGTERM, handle_quit);
   signal(SIGINT, handle_quit);
-  for (uint64_t iter = 0; iter < trace.ttl_max; ++iter) {
-    const int retval = handle_probes();
-    if (retval == 1 || retval == 0)
-      break;
-    trace.ttl += 1;
-    if (change_ttl(trace.sck, trace.ttl))
-      break;
-    sleep(trace.wait_prob);
+  // send each probes
+  for (uint64_t i = trace.first_ttl; i <= trace.ttl_max; ++i) {
+    const uint16_t port = htons(trace.port + i);
+    for (uint64_t j = 0; j < trace.nbr_probes; ++j) {
+      if (send_probe(port, i, i * j)) {
+        cleanup();
+        return 1;
+      }
+    }
+  }
+  signal(SIGALRM, handle_quit);
+  alarm(trace.waittime);
+  while (timeout == false) {
+    uint8_t packet[sizeof(struct ip) + sizeof(struct icmp)];
+    struct sockaddr_in src;
+    ft_memset(packet, 0, sizeof(packet));
+    const uint64_t retval = grab_packet(packet, &src);
+    if (retval == 1) {
+      cleanup();
+      return 1;
+    }
+    if (retval == 2)
+      continue;
+    printf("identification %d\n", ntohs(((struct ip*)packet)->ip_id));
   }
   cleanup();
   return 0;
