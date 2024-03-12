@@ -9,8 +9,6 @@ void handle_quit(const int sig) {
     cleanup();
     exit(sig);
   }
-  if (sig == SIGALRM)
-    timeout = true;
 }
 
 int64_t ip_to_hostname(const char* ip, char* result_str) {
@@ -47,6 +45,7 @@ int64_t change_ttl(const int sock, const uint64_t new_ttl) {
   return 0;
 }
 
-double calculate_rtt(const struct timeval start_time, const struct timeval end_time) {
-  return ((end_time.tv_sec - start_time.tv_sec) * 1000000L + (end_time.tv_usec - start_time.tv_usec)) / 1000.0;
+double calculate_rtt(const struct timespec start_time, const struct timespec end_time) {
+  // Convert to ms the difference between the 2 timespec
+  return (end_time.tv_sec - start_time.tv_sec) * 1000.0 + (end_time.tv_nsec - start_time.tv_nsec) / 1000000.0;
 }

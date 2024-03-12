@@ -23,6 +23,8 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <netinet/udp.h>
+#include <linux/errqueue.h>
+#include <bsd/string.h>
 
 #define DEFAULT_FIRST_TLL 1
 #define DEFAULT_MAX_TTL 30
@@ -46,11 +48,14 @@ typedef struct {
   struct sockaddr_in recv_addr; // address of the "responder"
   struct timespec send_time; // time when the packet was sent
   struct timespec recv_time; // time when the packet was received
-  double rtt; //round trip time in ms
+  struct msghdr msg; // message received
+  uint8_t packet[1024]; // packet received
+  struct cmsghdr* cmsg; // control message
+  struct sock_extended_err* sock_err; // error message
+  bool received; // true if the probe was received
 } t_probe;
 
 typedef struct {
-  uint64_t ttl; // current ttl (from 1 to `ttl_max`)
   uint64_t first_ttl; // first ttl to use (default to 1)
   uint64_t ttl_max; // max ttl (default to 30)
   uint64_t size_probe; // size of the probe (default to 60)
@@ -66,8 +71,8 @@ typedef struct {
 } t_opt;
 
 extern t_opt trace;
-extern volatile bool timeout;
 extern t_set* sockets;
+extern fd_set readfds;
 
 // Init a t_tc struct based on argc/argv
 int64_t init_tc(const int ac, const char** av);
@@ -88,9 +93,9 @@ int64_t change_ttl(int sock, uint64_t new_ttl);
 int32_t hostname_to_sockaddr(const char* hostname, void* result_ptr);
 
 //calculate rtt between 2 timeval
-double calculate_rtt(struct timeval start_time, struct timeval end_time);
+double calculate_rtt(struct timespec start_time, struct timespec end_time);
 
-// Calculate the checksum of a given ip header
-uint16_t checksum_ip(uint16_t* addr, uint64_t count);
+// print the result of the trace
+int64_t print_result(void);
 
 #endif // FT_TRACEROUTE_H

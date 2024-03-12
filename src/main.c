@@ -3,20 +3,81 @@
 t_opt trace;
 volatile bool timeout;
 t_set* sockets;
+fd_set readfds;
 
 uint64_t send_probe(t_probe* probe) {
   uint8_t packet[trace.size_probe];
 
   ft_memset(packet, 0, sizeof(packet));
-  const int64_t retval = sendto(probe->sck, packet, sizeof(packet), 0, (struct sockaddr*)&probe->dest, sizeof(probe->dest));
+  const int64_t retval =
+    sendto(probe->sck, packet, sizeof(packet), 0, (struct sockaddr*)&probe->dest, sizeof(probe->dest));
   if (retval == -1) {
     perror("sendto");
     return 1;
   }
+  clock_gettime(CLOCK_MONOTONIC, &probe->send_time);
+  return 0;
+}
+
+uint64_t handle_error(t_probe* probe) {
+  probe->msg.msg_name = NULL;
+  probe->msg.msg_namelen = 0;
+  probe->msg.msg_iov = NULL;
+  probe->msg.msg_iovlen = 0;
+  probe->msg.msg_flags = 0;
+  probe->msg.msg_control = &probe->packet;
+  probe->msg.msg_controllen = sizeof(probe->packet);
+
+  const int64_t retval = recvmsg(probe->sck, &probe->msg, MSG_ERRQUEUE);
+  if (retval == -1) {
+    perror("recvmsg");
+    return 1;
+  }
+  for (probe->cmsg = CMSG_FIRSTHDR(&probe->msg); probe->cmsg; probe->cmsg = CMSG_NXTHDR(&probe->msg, probe->cmsg)) {
+    if (probe->cmsg->cmsg_level != SOL_IP) // We only want IP level errors
+      continue;
+    if (probe->cmsg->cmsg_type != IP_RECVERR) // We only want IP_RECVERR errors
+      continue;
+    probe->sock_err = (struct sock_extended_err*)CMSG_DATA(probe->cmsg);
+    if (probe->sock_err == NULL) // We need data to continue
+      continue;
+    if (probe->sock_err->ee_origin != SO_EE_ORIGIN_ICMP) // We only want ICMP errors
+      continue;
+    probe->recv_addr = *(struct sockaddr_in*)SO_EE_OFFENDER(probe->sock_err);
+    if (probe->sock_err->ee_type == ICMP_TIME_EXCEEDED && probe->sock_err->ee_code == ICMP_EXC_TTL) {
+      probe->received = true;
+      clock_gettime(CLOCK_MONOTONIC, &probe->recv_time);
+      return 1; // TTL exceeded keep going
+    }
+    if (probe->sock_err->ee_type == ICMP_DEST_UNREACH && probe->sock_err->ee_code == ICMP_PORT_UNREACH) {
+      probe->received = true;
+      clock_gettime(CLOCK_MONOTONIC, &probe->recv_time);
+      return 2; // port unreachable, we are done
+    }
+  }
+  return 0; // Other error, we stop
+}
+
+uint64_t grab_answer(t_probe* probe) {
+  socklen_t len = sizeof(probe->recv_addr);
+  int64_t retval =
+    recvfrom(probe->sck, probe->packet, sizeof(probe->packet), 0, (struct sockaddr*)&probe->recv_addr, &len);
+  if (retval == -1) {
+    // handle potential ICMP error
+    retval = handle_error(probe);
+    if (retval == 1 || retval == 2)
+      return 0;
+    return 1;
+  }
+  probe->received = true;
+  clock_gettime(CLOCK_MONOTONIC, &probe->recv_time);
   return 0;
 }
 
 int main(int ac, const char** av) {
+  struct timeval timeout;
+
+  FD_ZERO(&readfds);
   if (ac == 1) {
     fprintf(stderr, "Usage: ft_traceroute [option] host\n");
     return 1;
@@ -24,13 +85,16 @@ int main(int ac, const char** av) {
   // Init option and sockets set
   if (init_tc(ac, av))
     return 1;
-
+  printf("traceroute to %s (%s), %ld hops max, %ld byte packets\n", av[1], inet_ntoa(trace.ip_addr.sin_addr),
+         trace.ttl_max, trace.size_probe);
+  timeout.tv_sec = trace.waittime;
+  timeout.tv_usec = 0;
   signal(SIGTERM, handle_quit);
   signal(SIGINT, handle_quit);
-  for (uint64_t i = trace.first_ttl; i <= trace.ttl_max; ++i) {
-    uint16_t port = htons(trace.port + i);
+  for (uint64_t i = trace.first_ttl - 1; i < trace.ttl_max; ++i) {
+    const uint16_t port = htons(trace.port + i);
     for (uint64_t j = 0; j < trace.nbr_probes; ++j) {
-      t_probe* probe = ft_set_get(sockets, i + j);
+      t_probe* probe = ft_set_get(sockets, i * trace.nbr_probes + j);
       probe->dest.sin_port = port;
       if (send_probe(probe)) {
         cleanup();
@@ -38,7 +102,33 @@ int main(int ac, const char** av) {
       }
     }
   }
-  printf("all probes sent\n");
+  while (true) {
+    const int64_t retval = select(FD_SETSIZE, &readfds, NULL, NULL, &timeout);
+    if (retval == -1) {
+      perror("select");
+      cleanup();
+      return 1;
+    }
+    if (retval == 0) // timeout reached
+      break;
+    for (uint64_t i = 0; i < trace.nbr_total_probes; ++i) {
+      t_probe* probe = ft_set_get(sockets, i);
+      if (FD_ISSET(probe->sck, &readfds) == false)
+        continue;
+      if (grab_answer(probe)) {
+        cleanup();
+        return 1;
+      }
+    }
+    // reset the readfds
+    FD_ZERO(&readfds);
+    for (uint64_t i = 0; i < trace.nbr_total_probes; ++i) {
+      const t_probe* probe = ft_set_get(sockets, i);
+      if (probe->received == false)
+        FD_SET(probe->sck, &readfds);
+    }
+  }
+  print_result();
   cleanup();
   return 0;
 }

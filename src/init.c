@@ -11,7 +11,6 @@ void cleanup(void) { ft_set_destroy(sockets, clean_probe); }
 void init_default() {
   trace.first_ttl = DEFAULT_FIRST_TLL;
   trace.ttl_max = DEFAULT_MAX_TTL;
-  trace.ttl = DEFAULT_FIRST_TLL;
   trace.size_probe = DEFAULT_SIZE_PACKET;
   trace.nbr_probes = DEFAULT_NBR_PROBES;
   trace.port = DEFAULT_UDP_PORT;
@@ -38,13 +37,15 @@ int64_t init_sockets() {
     perror("ft_set_iter:");
     return 1;
   }
-  for (uint64_t i = 0; i < sockets->len; ++i) {
-    t_probe* probe = ft_set_get(sockets, i);
-    probe->ttl = trace.first_ttl + i;
-    if (setsockopt(probe->sck, IPPROTO_IP, IP_TTL, &probe->ttl, sizeof(probe->ttl)) == -1) {
-      printf("probe->sck = %d\n", probe->sck);
-      perror("setsockopt ttl");
-      return 1;
+  for (uint64_t i = trace.first_ttl - 1; i < trace.ttl_max; ++i) {
+    for (uint64_t j = 0; j < trace.nbr_probes; ++j) {
+      t_probe* probe = ft_set_get(sockets, i * trace.nbr_probes + j);
+      probe->ttl = trace.first_ttl + i;
+      if (setsockopt(probe->sck, SOL_IP, IP_TTL, &probe->ttl, sizeof(probe->ttl)) == -1) {
+        printf("probe->sck = %d\n", probe->sck);
+        perror("setsockopt ttl");
+        return 1;
+      }
     }
   }
   return 0;
@@ -66,15 +67,16 @@ int64_t init_tc(const int ac, const char** av) {
 static uint64_t init_probe(void* ptr) {
   t_probe* probe = ptr;
   ft_memset(probe, 0, sizeof(t_probe));
-  probe->sck = socket(AF_INET, SOCK_DGRAM, 0);
+  probe->sck = socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, IPPROTO_UDP);
   if (probe->sck == -1) {
     perror("socket");
     return 1;
   }
-  if (setsockopt(probe->sck, SOL_IP, IP_RECVERR, &(int){1}, sizeof(int)) == -1) {
+  if (setsockopt(probe->sck, SOL_IP, IP_RECVERR, &(int[]){1}, sizeof(int)) == -1) {
     perror("setsockopt recverr");
     return 1;
   }
+  FD_SET(probe->sck, &readfds);
   probe->dest.sin_family = AF_INET;
   probe->dest.sin_addr = trace.ip_addr.sin_addr;
   return 0;
