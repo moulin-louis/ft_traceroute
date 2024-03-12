@@ -11,21 +11,13 @@
 #include <arpa/inet.h>
 #include <bits/local_lim.h>
 #include <bsd/string.h>
-#include <errno.h>
-#include <ifaddrs.h>
 #include <linux/errqueue.h>
 #include <netdb.h>
 #include <netinet/in.h>
-#include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-#include <netinet/udp.h>
 #include <signal.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <sys/select.h>
 #include <sys/socket.h>
-#include <sys/time.h>
-#include <unistd.h>
 
 #define DEFAULT_FIRST_TLL 1
 #define DEFAULT_MAX_TTL 30

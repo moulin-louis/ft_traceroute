@@ -20,8 +20,9 @@ uint64_t print_info_ttl(uint8_t ttl) {
   // printf("sock_err: \n");
   // ft_hexdump(&probe->sock_err, sizeof(struct sock_extended_err), 0);
   // printf("type = %d, code = %d\n", probe->sock_err->ee_type, probe->sock_err->ee_code);
-  if (probe->sock_err->ee_type == ICMP_DEST_UNREACH && probe->sock_err->ee_code == ICMP_PORT_UNREACH)
-    end = true;
+  if (probe->sock_err)
+    if (probe->sock_err->ee_type == ICMP_DEST_UNREACH && probe->sock_err->ee_code == ICMP_PORT_UNREACH)
+      end = true;
 
   t_probe* end_probe = ft_set_get(sockets, i);
   for (; i < trace.nbr_total_probes; ++i, end_probe = ft_set_get(sockets, i)) {

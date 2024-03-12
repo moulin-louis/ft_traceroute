@@ -32,6 +32,9 @@ static int parse_argp(const int key, char* arg, struct argp_state* state) {
     if (state->arg_num < 1)
       argp_usage(state);
     break;
+  case 'v':
+    printf("Version 1.0, Louis MOULIN, loumouli\n");
+    break;
   }
   return 0;
 }
@@ -48,6 +51,7 @@ int32_t parse_opt(int ac, char** av) {
      "Specifies the destination port base traceroute will use (the destination port number will be incremented by each "
      "probe).",
      0},
+    {"version", 'v', 0, 0, "Print version info", 0},
     {0},
   };
   struct argp argp = {0};
