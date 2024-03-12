@@ -4,16 +4,8 @@
 
 #include "ft_traceroute.h"
 
-void cleanup(void) {
-  close(trace.sck);
-  close(trace.icmp_sck);
-  if (trace.probes)
-    ft_set_destroy(trace.probes);
-}
-
 void handle_quit(const int sig) {
   if (sig == SIGTERM || sig == SIGINT) {
-    cleanup();
     exit(sig);
   }
   if (sig == SIGALRM) {
@@ -57,22 +49,4 @@ int64_t change_ttl(const int sock, const uint64_t new_ttl) {
 
 double calculate_rtt(const struct timeval start_time, const struct timeval end_time) {
   return ((end_time.tv_sec - start_time.tv_sec) * 1000000L + (end_time.tv_usec - start_time.tv_usec)) / 1000.0;
-}
-
-// calculate the checksum of the ip header
-uint16_t checksum(uint16_t* iphdr, uint64_t nbytes) {
-  uint16_t result = 0;
-  uint32_t sum = 0;
-  while (nbytes > 1) {
-    sum += *iphdr++;
-    nbytes -= 2;
-  }
-  if (nbytes == 1) {
-    *(uint8_t*)&result = *(uint8_t*)iphdr;
-    sum += result;
-  }
-  sum = (sum >> 16) + (sum & 0xFFFF);
-  sum += (sum >> 16);
-  result = ~sum;
-  return result;
 }

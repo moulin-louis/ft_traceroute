@@ -40,10 +40,12 @@ typedef enum {
 } E_PROT;
 
 typedef struct {
-  struct timeval start_time;
-  struct timeval end_time;
-  struct sockaddr_in src;
-  struct icmphdr icmphdr;
+  int sck;  //socket to send the probe packet and receive error message
+  uint8_t ttl; // current ttl of the probe
+  struct sockaddr_in dest; // dest address info
+  struct sockaddr_in recv_addr; // address of the "responder"
+  struct timespec send_time; // time when the packet was sent
+  struct timespec recv_time; // time when the packet was received
   double rtt; //round trip time in ms
 } t_probe;
 
@@ -56,19 +58,13 @@ typedef struct {
   uint16_t port; // port used to send the udp packet (default to TC_PORT)
   uint64_t waittime; // time in seconds to wait for a ICMP response (default to 5)
   uint64_t wait_prob; // tine in second to wait between probe sending (default to 0)
+  uint64_t nbr_total_probes; // total number of probes to send
   E_PROT prot; // protocul used (default to E_UDP)
-  int sck; // socket to send the probe packet
-  int icmp_sck; // socket used to receive ICMP response
-  uint8_t*  packet; // buffer to store the probe packet
-  uint64_t size_packet; // size of the packet buffer
-  uint16_t id; //ipv4 id
-  struct sockaddr_in src; // source address info
-  struct sockaddr_in dest; // dest address info
-  t_set* probes; // set of probes for each TTL
-} t_tc;
+} t_opt;
 
-extern t_tc trace;
+extern t_opt trace;
 extern volatile bool timeout;
+extern t_set* sockets;
 
 // Init a t_tc struct based on argc/argv
 int64_t init_tc(const int ac, const char** av);
@@ -89,9 +85,9 @@ int64_t change_ttl(int sock, uint64_t new_ttl);
 int32_t hostname_to_sockaddr(const char* hostname, void* result_ptr);
 
 //calculate rtt between 2 timeval
-double calculate_rtt(const struct timeval start_time, const struct timeval end_time);
+double calculate_rtt(struct timeval start_time, struct timeval end_time);
 
-// Calculate the checksum of a given buffer
-uint16_t checksum(uint16_t* iphdr, uint64_t nbytes);
+// Calculate the checksum of a given ip header
+uint16_t checksum_ip(uint16_t* addr, uint64_t count);
 
 #endif // FT_TRACEROUTE_H
