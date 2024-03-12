@@ -61,7 +61,8 @@ uint64_t handle_error(t_probe* probe) {
 
 uint64_t grab_answer(t_probe* probe) {
   socklen_t len = sizeof(probe->recv_addr);
-  int64_t retval = recvfrom(probe->sck, probe->packet, sizeof(probe->packet), 0, (struct sockaddr*)&probe->recv_addr, &len);
+  int64_t retval =
+    recvfrom(probe->sck, probe->packet, sizeof(probe->packet), 0, (struct sockaddr*)&probe->recv_addr, &len);
   if (retval == -1) {
     // handle potential ICMP error
     return handle_error(probe);
