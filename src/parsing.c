@@ -6,76 +6,32 @@
 
 static int parse_argp(const int key, char* arg, struct argp_state* state) {
   switch (key) {
-  case 'f': {
-    char* end_ptr = NULL;
-    const int64_t first_ttl = strtoll(arg, &end_ptr, 10);
-    if (end_ptr == arg)
-      argp_failure(state, 1, 0, "first_ttl: cant convert");
-    if (first_ttl < 0 || first_ttl > 255)
-      argp_failure(state, 1, 0, "first_ttl: invalid number");
-    trace.first_ttl = first_ttl;
+  case 'f':
+    trace.first_ttl = atoi(arg);
     break;
-  }
-  case 'm': {
-    char* end_ptr = NULL;
-    const int64_t max_ttl = strtoll(arg, &end_ptr, 10);
-    if (end_ptr == arg)
-      argp_failure(state, 1, 0, "max_ttl: cant convert");
-    if (max_ttl < 0 || max_ttl > 255)
-      argp_failure(state, 1, 0, "max_ttl: invalid number");
-    trace.max_ttl = max_ttl;
+  case 'm':
+    trace.max_ttl = atoi(arg);
     break;
-  }
-  case 'w': {
-    char* end_ptr = NULL;
-    const int64_t waittime = strtoll(arg, &end_ptr, 10);
-    if (end_ptr == arg)
-      argp_failure(state, 1, 0, "waittime: cant convert");
-    if (waittime < 0 || waittime > 255)
-      argp_failure(state, 1, 0, "waittime: invalid number");
-    trace.waittime = waittime;
+  case 'w':
+    trace.waittime = atoi(arg);
     break;
-  }
-  case 'z': {
-    char* end_ptr = NULL;
-    const int64_t sendwait = strtoll(arg, &end_ptr, 10);
-    if (end_ptr == arg)
-      argp_failure(state, 1, 0, "sendwait: cant convert");
-    if (sendwait < 0 || sendwait > 255)
-      argp_failure(state, 1, 0, "send_wait: invalid number");
-    trace.sendwait = sendwait;
+  case 'z':
+    trace.sendwait = atoi(arg);
     break;
-  }
-  case 'q': {
-    char* end_ptr = NULL;
-    const int64_t nquerries = strtoll(arg, &end_ptr, 10);
-    if (end_ptr == arg)
-      argp_failure(state, 1, 0, "nquerries: cant convert");
-    if (nquerries < 0 || nquerries > 255)
-      argp_failure(state, 1, 0, "nquerries: invalid number");
-    trace.nquerries = nquerries;
+  case 'q':
+    trace.nquerries = atoi(arg);
     break;
-  }
-  case 'p': {
-    char* end_ptr = NULL;
-    const uint16_t port = strtol(arg, &end_ptr, 10);
-    if (end_ptr == arg)
-      argp_failure(state, 1, 0, "port: cant convert");
-    if (port < 0 || port > UINT16_MAX)
-      argp_failure(state, 1, 0, "port: invalid number");
-    trace.port = port;
+  case 'p':
+    trace.port = atoi(arg);
     break;
-  }
-  case ARGP_KEY_ARG: {
+  case ARGP_KEY_ARG:
     if (state->arg_num == 1)
       trace.packet_len = atoi(arg);
     break;
-  }
-  case ARGP_KEY_END: {
+  case ARGP_KEY_END:
     if (state->arg_num < 1)
       argp_usage(state);
     break;
-  }
   }
   return 0;
 }
