@@ -29,19 +29,10 @@ int32_t hostname_to_sockaddr(const char* hostname, void* result_ptr) {
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_RAW;
   const int retval = getaddrinfo(hostname, NULL, &hints, &result);
-  if (retval != 0)
+  if (retval > 0)
     return retval;
   memcpy(result_ptr, result->ai_addr, result->ai_addrlen);
   freeaddrinfo(result);
-  return 0;
-}
-
-int64_t change_ttl(const int sock, const uint64_t new_ttl) {
-  const int retval = setsockopt(sock, IPPROTO_IP, IP_TTL, &new_ttl, sizeof(new_ttl));
-  if (retval == -1) {
-    perror("setsockopt ttl");
-    return 1;
-  }
   return 0;
 }
 

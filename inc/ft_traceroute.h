@@ -7,14 +7,18 @@
 
 #include "libft.h"
 
+#include <argp.h>
 #include <arpa/inet.h>
 #include <bits/local_lim.h>
+#include <bsd/string.h>
 #include <errno.h>
+#include <ifaddrs.h>
+#include <linux/errqueue.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-#include <ifaddrs.h>
+#include <netinet/udp.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -22,27 +26,17 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <netinet/udp.h>
-#include <linux/errqueue.h>
-#include <bsd/string.h>
 
 #define DEFAULT_FIRST_TLL 1
 #define DEFAULT_MAX_TTL 30
 #define DEFAULT_SIZE_PACKET 60
 #define DEFAULT_NBR_PROBES 3
 #define DEFAULT_UDP_PORT 33434
-#define DEFAULT_PROT E_UDP
 #define DEFAULT_WAITTIME 5
 #define DEFAULT_WAIT_PROBE 0
 
-// Which protocol used to send for probes
-typedef enum {
-  E_ICMP = 1 << 0, // Use ICMP request
-  E_UDP = 1 << 1, // Use UDP packet
-} E_PROT;
-
 typedef struct {
-  int sck;  //socket to send the probe packet and receive error message
+  int sck; // socket to send the probe packet and receive error message
   uint8_t ttl; // current ttl of the probe
   struct sockaddr_in dest; // dest address info
   struct sockaddr_in recv_addr; // address of the "responder"
@@ -57,16 +51,14 @@ typedef struct {
 
 typedef struct {
   uint64_t first_ttl; // first ttl to use (default to 1)
-  uint64_t ttl_max; // max ttl (default to 30)
-  uint64_t size_probe; // size of the probe (default to 60)
-  uint64_t nbr_probes; // number of probes to send for each ttl (default to 3)
+  uint64_t max_ttl; // max ttl (default to 30)
+  uint64_t packet_len; // size of the probe (default to 60)
+  uint64_t nquerries; // number of probes to send for each ttl (default to 3)
   uint16_t port; // port used to send the udp packet (default to TC_PORT)
   uint64_t waittime; // time in seconds to wait for a ICMP response (default to 5)
-  uint64_t wait_prob; // tine in second to wait between probe sending (default to 0)
+  uint64_t sendwait; // tine in second to wait between probe sending (default to 0)
   uint64_t nbr_total_probes; // total number of probes to send
-  E_PROT prot; // protocul used (default to E_UDP)
   uint8_t hostname[HOST_NAME_MAX]; // hostname to trace
-  uint8_t* ip; // ip of the hostname
   struct sockaddr_in ip_addr; // ip address info
 } t_opt;
 
@@ -75,7 +67,10 @@ extern t_set* sockets;
 extern fd_set readfds;
 
 // Init a t_tc struct based on argc/argv
-int64_t init_tc(const int ac, const char** av);
+int64_t init_tc(int ac, char** av);
+
+// Use argp to parse command line options
+int32_t parse_opt(int ac, char** av);
 
 // cleanup the trace struct (close both socket)
 void cleanup(void);
@@ -92,7 +87,7 @@ int64_t change_ttl(int sock, uint64_t new_ttl);
 // Convert a given hostname in ASCII to a already-allocated sockaddr
 int32_t hostname_to_sockaddr(const char* hostname, void* result_ptr);
 
-//calculate rtt between 2 timeval
+// calculate rtt between 2 timeval
 double calculate_rtt(struct timespec start_time, struct timespec end_time);
 
 // print the result of the trace

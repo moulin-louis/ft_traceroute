@@ -17,8 +17,10 @@ uint64_t print_info_ttl(uint8_t ttl) {
     if (probe->ttl == ttl)
       break;
   }
-  if (probe->sock_err &&
-      (probe->sock_err->ee_type == ICMP_DEST_UNREACH && probe->sock_err->ee_code == ICMP_PORT_UNREACH))
+  // printf("sock_err: \n");
+  // ft_hexdump(&probe->sock_err, sizeof(struct sock_extended_err), 0);
+  // printf("type = %d, code = %d\n", probe->sock_err->ee_type, probe->sock_err->ee_code);
+  if (probe->sock_err->ee_type == ICMP_DEST_UNREACH && probe->sock_err->ee_code == ICMP_PORT_UNREACH)
     end = true;
 
   t_probe* end_probe = ft_set_get(sockets, i);
@@ -56,10 +58,8 @@ uint64_t print_info_ttl(uint8_t ttl) {
 }
 
 int64_t print_result(void) {
-  for (uint64_t i = trace.first_ttl; i <= trace.ttl_max; ++i) {
-    const uint64_t retval = print_info_ttl(i);
-    if (retval == 1)
-      return 1;
+  for (uint64_t i = trace.first_ttl; i <= trace.max_ttl; ++i) {
+    int retval = print_info_ttl(i);
     if (retval == 2)
       break;
   }

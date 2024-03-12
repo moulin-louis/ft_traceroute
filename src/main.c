@@ -6,7 +6,7 @@ t_set* sockets;
 fd_set readfds;
 
 uint64_t send_probe(t_probe* probe) {
-  uint8_t packet[trace.size_probe];
+  uint8_t packet[trace.packet_len];
 
   ft_memset(packet, 0, sizeof(packet));
   const int64_t retval =
@@ -58,23 +58,20 @@ uint64_t handle_error(t_probe* probe) {
   return 0; // Other error, we stop
 }
 
+
 uint64_t grab_answer(t_probe* probe) {
   socklen_t len = sizeof(probe->recv_addr);
-  int64_t retval =
-    recvfrom(probe->sck, probe->packet, sizeof(probe->packet), 0, (struct sockaddr*)&probe->recv_addr, &len);
+  int64_t retval = recvfrom(probe->sck, probe->packet, sizeof(probe->packet), 0, (struct sockaddr*)&probe->recv_addr, &len);
   if (retval == -1) {
     // handle potential ICMP error
-    retval = handle_error(probe);
-    if (retval == 1 || retval == 2)
-      return 0;
-    return 1;
+    return handle_error(probe);
   }
   probe->received = true;
   clock_gettime(CLOCK_MONOTONIC, &probe->recv_time);
   return 0;
 }
 
-int main(int ac, const char** av) {
+int main(int ac, char** av) {
   struct timeval timeout;
 
   FD_ZERO(&readfds);
@@ -86,15 +83,15 @@ int main(int ac, const char** av) {
   if (init_tc(ac, av))
     return 1;
   printf("traceroute to %s (%s), %ld hops max, %ld byte packets\n", av[1], inet_ntoa(trace.ip_addr.sin_addr),
-         trace.ttl_max, trace.size_probe);
+         trace.max_ttl, trace.packet_len);
   timeout.tv_sec = trace.waittime;
   timeout.tv_usec = 0;
   signal(SIGTERM, handle_quit);
   signal(SIGINT, handle_quit);
-  for (uint64_t i = trace.first_ttl - 1; i < trace.ttl_max; ++i) {
+  for (uint64_t i = trace.first_ttl - 1; i < trace.max_ttl; ++i) {
     const uint16_t port = htons(trace.port + i);
-    for (uint64_t j = 0; j < trace.nbr_probes; ++j) {
-      t_probe* probe = ft_set_get(sockets, i * trace.nbr_probes + j);
+    for (uint64_t j = 0; j < trace.nquerries; ++j) {
+      t_probe* probe = ft_set_get(sockets, i * trace.nquerries + j);
       probe->dest.sin_port = port;
       if (send_probe(probe)) {
         cleanup();
@@ -115,10 +112,9 @@ int main(int ac, const char** av) {
       t_probe* probe = ft_set_get(sockets, i);
       if (FD_ISSET(probe->sck, &readfds) == false)
         continue;
-      if (grab_answer(probe)) {
-        cleanup();
-        return 1;
-      }
+      uint64_t retval = grab_answer(probe);
+      if (retval == 3 || retval == 1)
+        break;
     }
     // reset the readfds
     FD_ZERO(&readfds);

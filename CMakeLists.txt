@@ -9,5 +9,6 @@ add_subdirectory(./src/libft)
 
 add_executable(ft_traceroute src/main.c src/utils.c
         src/init.c
-        src/print.c)
+        src/print.c
+        src/parsing.c)
 target_link_libraries(ft_traceroute ft)

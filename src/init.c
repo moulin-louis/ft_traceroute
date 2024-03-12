@@ -10,14 +10,13 @@ void cleanup(void) { ft_set_destroy(sockets, clean_probe); }
 
 void init_default() {
   trace.first_ttl = DEFAULT_FIRST_TLL;
-  trace.ttl_max = DEFAULT_MAX_TTL;
-  trace.size_probe = DEFAULT_SIZE_PACKET;
-  trace.nbr_probes = DEFAULT_NBR_PROBES;
+  trace.max_ttl = DEFAULT_MAX_TTL;
+  trace.packet_len = DEFAULT_SIZE_PACKET;
+  trace.nquerries = DEFAULT_NBR_PROBES;
   trace.port = DEFAULT_UDP_PORT;
-  trace.prot = DEFAULT_PROT;
   trace.waittime = DEFAULT_WAITTIME;
-  trace.wait_prob = DEFAULT_WAIT_PROBE;
-  trace.nbr_total_probes = (trace.ttl_max - (trace.first_ttl - 1)) * trace.nbr_probes;
+  trace.sendwait = DEFAULT_WAIT_PROBE;
+  trace.nbr_total_probes = (trace.max_ttl - (trace.first_ttl - 1)) * trace.nquerries;
 }
 
 int64_t init_sockets() {
@@ -37,9 +36,9 @@ int64_t init_sockets() {
     perror("ft_set_iter:");
     return 1;
   }
-  for (uint64_t i = trace.first_ttl - 1; i < trace.ttl_max; ++i) {
-    for (uint64_t j = 0; j < trace.nbr_probes; ++j) {
-      t_probe* probe = ft_set_get(sockets, i * trace.nbr_probes + j);
+  for (uint64_t i = trace.first_ttl - 1; i < trace.max_ttl; ++i) {
+    for (uint64_t j = 0; j < trace.nquerries; ++j) {
+      t_probe* probe = ft_set_get(sockets, i * trace.nquerries + j);
       probe->ttl = trace.first_ttl + i;
       if (setsockopt(probe->sck, SOL_IP, IP_TTL, &probe->ttl, sizeof(probe->ttl)) == -1) {
         printf("probe->sck = %d\n", probe->sck);
@@ -51,14 +50,26 @@ int64_t init_sockets() {
   return 0;
 }
 
-int64_t init_tc(const int ac, const char** av) {
+void print_options(void) {
+  printf("firs_ttl = %ld\n", trace.first_ttl);
+  printf("ttl_max = %ld\n", trace.max_ttl);
+  printf("nbr_probes = %ld\n", trace.nquerries);
+  printf("waittime = %ld\n", trace.waittime);
+  printf("wait_prob = %ld\n", trace.sendwait);
+  printf("port = %u\n", trace.port);
+  printf("packet size = %ld\n", trace.packet_len);
+}
+
+int64_t init_tc(int ac, char** av) {
   (void)ac;
   init_default();
-  trace.ip = (uint8_t*)av[1];
-  if (ip_to_hostname((char*)trace.ip, (char*)trace.hostname))
+  if (parse_opt(ac, av))
     return 1;
-  if (hostname_to_sockaddr((char*)trace.hostname, &trace.ip_addr))
+  strcpy((char*)trace.hostname, av[1]);
+  if (hostname_to_sockaddr((char*)trace.hostname, &trace.ip_addr)) {
+    perror("host_to_sockaddr");
     return 1;
+  }
   if (init_sockets())
     return 1;
   return 0;
