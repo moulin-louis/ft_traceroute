@@ -60,6 +60,9 @@ typedef struct {
   uint64_t wait_prob; // tine in second to wait between probe sending (default to 0)
   uint64_t nbr_total_probes; // total number of probes to send
   E_PROT prot; // protocul used (default to E_UDP)
+  uint8_t hostname[HOST_NAME_MAX]; // hostname to trace
+  uint8_t* ip; // ip of the hostname
+  struct sockaddr_in ip_addr; // ip address info
 } t_opt;
 
 extern t_opt trace;

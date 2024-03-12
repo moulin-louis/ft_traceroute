@@ -6,11 +6,11 @@
 
 void handle_quit(const int sig) {
   if (sig == SIGTERM || sig == SIGINT) {
+    cleanup();
     exit(sig);
   }
-  if (sig == SIGALRM) {
+  if (sig == SIGALRM)
     timeout = true;
-  }
 }
 
 int64_t ip_to_hostname(const char* ip, char* result_str) {
