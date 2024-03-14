@@ -73,9 +73,6 @@ void handle_quit(int sig);
 // Convert an ip string to an hostname
 int64_t ip_to_hostname(const char* ip, char* result_str);
 
-// Change the TTL of a given socket to a given ttl
-int64_t change_ttl(int sock, uint64_t new_ttl);
-
 // Convert a given hostname in ASCII to a already-allocated sockaddr
 int32_t hostname_to_sockaddr(const char* hostname, void* result_ptr);
 

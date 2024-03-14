@@ -39,7 +39,7 @@ static int parse_argp(const int key, char* arg, struct argp_state* state) {
   return 0;
 }
 
-int32_t parse_opt(int ac, char** av) {
+int32_t parse_opt(const int ac, char** av) {
   const struct argp_option options[] = {
     {"first_ttl", 'f', "NUM", 0, "Specifies with what TTL to start. Defaults to 1.", 0},
     {"max_ttl", 'm', "NUM", 0,

@@ -61,7 +61,7 @@ uint64_t handle_error(t_probe* probe) {
 
 uint64_t grab_answer(t_probe* probe) {
   socklen_t len = sizeof(probe->recv_addr);
-  int64_t retval =
+  const int64_t retval =
     recvfrom(probe->sck, probe->packet, sizeof(probe->packet), 0, (struct sockaddr*)&probe->recv_addr, &len);
   if (retval == -1) {
     // handle potential ICMP error
@@ -72,7 +72,7 @@ uint64_t grab_answer(t_probe* probe) {
   return 0;
 }
 
-int main(int ac, char** av) {
+int main(const int ac, char** av) {
   struct timeval timeout;
 
   FD_ZERO(&readfds);
@@ -113,8 +113,8 @@ int main(int ac, char** av) {
       t_probe* probe = ft_set_get(sockets, i);
       if (FD_ISSET(probe->sck, &readfds) == false)
         continue;
-      uint64_t retval = grab_answer(probe);
-      if (retval == 3 || retval == 1)
+      const uint64_t ret = grab_answer(probe);
+      if (ret == 3 || ret == 1)
         break;
     }
     // reset the readfds

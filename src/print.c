@@ -4,31 +4,31 @@
 
 #include "ft_traceroute.h"
 
-uint64_t print_info_ttl(uint8_t ttl) {
-  t_probe* probe = NULL;
-  char* old_ip = "a";
-  bool end = false;
+void init_ptr(t_probe** probe, t_probe** end_probe, const uint8_t ttl) {
   uint64_t i = 0;
-  char old_hostname[HOST_NAME_MAX] = {0};
-
-  old_hostname[0] = 'a';
   for (; i < sockets->len; ++i) {
-    probe = ft_set_get(sockets, i);
-    if (probe->ttl == ttl)
+    *probe = ft_set_get(sockets, i);
+    if ((*probe)->ttl == ttl)
       break;
   }
-  // printf("sock_err: \n");
-  // ft_hexdump(&probe->sock_err, sizeof(struct sock_extended_err), 0);
-  // printf("type = %d, code = %d\n", probe->sock_err->ee_type, probe->sock_err->ee_code);
+  *end_probe = ft_set_get(sockets, i);
+  for (; i < trace.nbr_total_probes; ++i, *end_probe = ft_set_get(sockets, i)) {
+    if ((*end_probe)->ttl != ttl)
+      break;
+  }
+}
+
+uint64_t print_info_ttl(const uint8_t ttl) {
+  t_probe *probe = NULL;
+  t_probe* end_probe = NULL;
+  const char* old_ip = "";
+  bool end = false;
+  char old_hostname[HOST_NAME_MAX] = {0};
+
+  init_ptr(&probe, &end_probe, ttl);
   if (probe->sock_err)
     if (probe->sock_err->ee_type == ICMP_DEST_UNREACH && probe->sock_err->ee_code == ICMP_PORT_UNREACH)
       end = true;
-
-  t_probe* end_probe = ft_set_get(sockets, i);
-  for (; i < trace.nbr_total_probes; ++i, end_probe = ft_set_get(sockets, i)) {
-    if (end_probe->ttl != ttl)
-      break;
-  }
   printf("%2u ", ttl);
   for (; probe != end_probe; probe++) {
     char* ip_str = inet_ntoa(probe->recv_addr.sin_addr);
@@ -60,7 +60,7 @@ uint64_t print_info_ttl(uint8_t ttl) {
 
 int64_t print_result(void) {
   for (uint64_t i = trace.first_ttl; i <= trace.max_ttl; ++i) {
-    int retval = print_info_ttl(i);
+    const int retval = print_info_ttl(i);
     if (retval == 2)
       break;
   }
