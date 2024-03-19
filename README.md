@@ -6,8 +6,8 @@
 
 ## Description:
 
-- This project is the gateway to the encryption branch.
-- You will recode part of the OpenSSL program, specifically the MD5 and SHA-256 hashing algorithms.
+- The subject aims to make you recode the traceroute command so you can have a clearer
+view of what’s going on in your network.
 
 ## Note:
 
