@@ -19,7 +19,7 @@ void init_ptr(t_probe** probe, t_probe** end_probe, const uint8_t ttl) {
 }
 
 uint64_t print_info_ttl(const uint8_t ttl) {
-  t_probe *probe = NULL;
+  t_probe* probe = NULL;
   t_probe* end_probe = NULL;
   const char* old_ip = "";
   bool end = false;

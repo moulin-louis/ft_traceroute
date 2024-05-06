@@ -56,7 +56,7 @@ typedef struct {
 
 extern t_opt trace;
 extern t_set* sockets;
-extern fd_set readfds;
+extern fd_set readfds; //used for select
 
 // Init a t_tc struct based on argc/argv
 int64_t init_tc(int ac, char** av);

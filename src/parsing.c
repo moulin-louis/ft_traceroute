@@ -35,18 +35,19 @@ static int parse_argp(const int key, char* arg, struct argp_state* state) {
   case 'v':
     printf("Version 1.0, Louis MOULIN, loumouli\n");
     break;
+  default: {}
   }
   return 0;
 }
 
 int32_t parse_opt(const int ac, char** av) {
   const struct argp_option options[] = {
-    {"first_ttl", 'f', "NUM", 0, "Specifies with what TTL to start. Defaults to 1.", 0},
+    {"first_ttl", 'f', "NUM", 0, "Specifies with what TTL to start (default 1)", 0},
     {"max_ttl", 'm', "NUM", 0,
-     "Specifies the maximum number of hops (max time-to-live value) traceroute will probe. The default is 30.", 0},
+     "Specifies the maximum number of hops (max time-to-live value) traceroute will probe (default 30)", 0},
     {"waittime", 'w', "NUM", 0, "Set the time (in seconds) to wait for a response to a probe (default 5.0 sec).", 0},
     {"sendwait", 'z', "NUM", 0, "Minimal time interval between probes (default 0).", 0},
-    {"nquerries", 'q', "NUM", 0, "Sets the number of probe packets per hop. The default is 3.", 0},
+    {"nquerries", 'q', "NUM", 0, "Sets the number of probe packets per hope (default 3)", 0},
     {"port", 'p', "NUM", 0,
      "Specifies the destination port base traceroute will use (the destination port number will be incremented by each "
      "probe).",
