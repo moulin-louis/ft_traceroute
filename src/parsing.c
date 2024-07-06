@@ -25,6 +25,8 @@ static int parse_argp(const int key, char* arg, struct argp_state* state) {
     trace.port = atoi(arg);
     break;
   case ARGP_KEY_ARG:
+    if (state->arg_num == 0)
+      strcpy((char*)trace.hostname, arg);
     if (state->arg_num == 1)
       trace.packet_len = atoi(arg);
     break;

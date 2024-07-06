@@ -7,8 +7,7 @@ EXEC = ft_traceroute
 
 all:
 	cmake -S . -B $(BUILD_FOLDER)
-	cmake --build $(BUILD_FOLDER) -j 12
-
+	cmake --build $(BUILD_FOLDER)
 clean:
 	find $(BUILD_FOLDER) -type f ! -name "$(EXEC)" -delete
 	find $(BUILD_FOLDER) -type d ! -path "$(BUILD_FOLDER)" -exec rm -rf {} +

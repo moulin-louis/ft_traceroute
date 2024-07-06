@@ -83,7 +83,7 @@ int main(const int ac, char** av) {
   // Init option and sockets set
   if (init_tc(ac, av))
     return 1;
-  printf("traceroute to %s (%s), %ld hops max, %ld byte packets\n", av[1], inet_ntoa(trace.ip_addr.sin_addr),
+  printf("traceroute to %s (%s), %ld hops max, %ld byte packets\n", trace.hostname, inet_ntoa(trace.ip_addr.sin_addr),
          trace.max_ttl, trace.packet_len);
   timeout.tv_sec = trace.waittime;
   timeout.tv_usec = 0;
@@ -98,6 +98,8 @@ int main(const int ac, char** av) {
         cleanup();
         return 1;
       }
+      if (trace.sendwait > 0)
+        sleep(trace.sendwait);
     }
   }
   while (true) {

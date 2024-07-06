@@ -10,7 +10,7 @@
 #include <argp.h>
 #include <arpa/inet.h>
 #include <bits/local_lim.h>
-#include <bsd/string.h>
+// #include <bsd/string.h>
 #include <linux/errqueue.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -19,7 +19,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 
-#define DEFAULT_FIRST_TLL 1
+#define DEFAULT_FIRST_TTL 1
 #define DEFAULT_MAX_TTL 30
 #define DEFAULT_SIZE_PACKET 60
 #define DEFAULT_NBR_PROBES 3

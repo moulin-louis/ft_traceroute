@@ -5,21 +5,46 @@
 #include "ft_traceroute.h"
 static uint64_t init_probe(void* ptr);
 static uint64_t clean_probe(void* ptr);
+static int64_t init_sockets(void);
 
-void cleanup(void) { ft_set_destroy(sockets, clean_probe); }
 
 void init_default() {
-  trace.first_ttl = DEFAULT_FIRST_TLL;
+  ft_memset(&trace, 0, sizeof(t_opt));
+  trace.first_ttl = DEFAULT_FIRST_TTL;
   trace.max_ttl = DEFAULT_MAX_TTL;
   trace.packet_len = DEFAULT_SIZE_PACKET;
   trace.nquerries = DEFAULT_NBR_PROBES;
   trace.port = DEFAULT_UDP_PORT;
   trace.waittime = DEFAULT_WAITTIME;
   trace.sendwait = DEFAULT_WAIT_PROBE;
-  trace.nbr_total_probes = (trace.max_ttl - (trace.first_ttl - 1)) * trace.nquerries;
 }
 
-int64_t init_sockets() {
+
+void print_options(void) {
+  printf("firs_ttl = %ld\n", trace.first_ttl);
+  printf("ttl_max = %ld\n", trace.max_ttl);
+  printf("nbr_probes = %ld\n", trace.nquerries);
+  printf("total probes = %ld\n", trace.nbr_total_probes);
+  printf("waittime = %ld\n", trace.waittime);
+  printf("wait_prob = %ld\n", trace.sendwait);
+  printf("port = %u\n", trace.port);
+  printf("packet size = %ld\n", trace.packet_len);
+}
+
+int64_t init_tc(int ac, char** av) {
+  (void)ac;
+  init_default();
+  if (parse_opt(ac, av))
+    return 1;
+  trace.nbr_total_probes = (trace.max_ttl - (trace.first_ttl - 1)) * trace.nquerries;
+  if (hostname_to_sockaddr((char*)trace.hostname, &trace.ip_addr) != 0)
+    return 1;
+  if (init_sockets())
+    return 1;
+  return 0;
+}
+
+static int64_t init_sockets() {
   sockets = ft_set_new(sizeof(t_probe));
   if (sockets == NULL) {
     perror("ft_set_new:");
@@ -41,37 +66,13 @@ int64_t init_sockets() {
       t_probe* probe = ft_set_get(sockets, i * trace.nquerries + j);
       probe->ttl = trace.first_ttl + i;
       if (setsockopt(probe->sck, SOL_IP, IP_TTL, &probe->ttl, sizeof(probe->ttl)) == -1) {
-        printf("probe->sck = %d\n", probe->sck);
+        dprintf(1, "probe->sck = %d\n", probe->sck);
+        dprintf(1, "i = %ld, j= %ld, nquerries = %ld, idx = %ld\n", i, j, trace.nquerries, i * trace.nquerries + j);
         perror("setsockopt ttl");
         return 1;
       }
     }
   }
-  return 0;
-}
-
-void print_options(void) {
-  printf("firs_ttl = %ld\n", trace.first_ttl);
-  printf("ttl_max = %ld\n", trace.max_ttl);
-  printf("nbr_probes = %ld\n", trace.nquerries);
-  printf("waittime = %ld\n", trace.waittime);
-  printf("wait_prob = %ld\n", trace.sendwait);
-  printf("port = %u\n", trace.port);
-  printf("packet size = %ld\n", trace.packet_len);
-}
-
-int64_t init_tc(int ac, char** av) {
-  (void)ac;
-  init_default();
-  if (parse_opt(ac, av))
-    return 1;
-  strcpy((char*)trace.hostname, av[1]);
-  if (hostname_to_sockaddr((char*)trace.hostname, &trace.ip_addr)) {
-    perror("host_to_sockaddr");
-    return 1;
-  }
-  if (init_sockets())
-    return 1;
   return 0;
 }
 
@@ -99,3 +100,5 @@ static uint64_t clean_probe(void* ptr) {
     close(probe->sck);
   return 0;
 }
+
+void cleanup(void) { ft_set_destroy(sockets, clean_probe); }
